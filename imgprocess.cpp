@@ -1,10 +1,28 @@
 ﻿#include "imgprocess.h"
 #include "qdir.h"
 #include "qstring.h"
+#include <direct.h>
 using namespace cv;
 using namespace std;
 
-void generateDirecorys(QString directory){
+void generateDirecorys_cbc(string path){//支持中文
+    string tmpPath = "";
+    for(auto ch : path){
+        tmpPath += ch;
+        if(ch == '/' || ch == '\\'){
+            if(_access(tmpPath.c_str(), 0) != 0){
+                int ret = _mkdir(tmpPath.c_str());
+                if(ret != 0){
+                    cout<<"mkdir error~"<<endl;
+                    return;
+                }
+            }
+        }
+    }
+}
+
+void generateDirecorys(QString directory_){//不支持中文
+    QString directory = directory_.toLocal8Bit();
     QDir sourceDir(directory);
     if(sourceDir.exists()) return;
     QString tempDir;
@@ -20,11 +38,18 @@ void generateDirecorys(QString directory){
 void img_process(string path, string outputPath, string filename) {
     outputPath += "/";
     Mat img = imread(filename, 1);
+    int halfRow = img.rows / 2, halfCol = img.cols / 2;
     Mat img_lur;
-    resize(img, img_lur, Size(), 0.1, 0.1);
-    int m = 45;
-    img_lur = img_lur(Range(m, img_lur.rows - m), Range(m, img_lur.cols - m));
+    int m = 300;
+    img_lur = img(Range(halfRow - m, halfRow + m), Range(halfCol - 3 * m, halfCol + 3 * m));
+    resize(img_lur, img_lur, Size(), 0.2, 0.2);
     //imwrite(path + "/cbc/img_lur0.jpg", img_lur);
+    medianBlur(img_lur, img_lur, 31);
+    resize(img_lur, img_lur, Size(img.cols, img.rows));
+    resize(img_lur, img_lur, Size(), 0.01, 0.01);
+    medianBlur(img_lur, img_lur, 31);
+    resize(img_lur, img_lur, Size(img.cols, img.rows));
+    resize(img_lur, img_lur, Size(), 0.01, 0.01);
     medianBlur(img_lur, img_lur, 31);
     resize(img_lur, img_lur, Size(img.cols, img.rows));
     //imwrite(path + "/cbc/img_lur.jpg", img_lur);
@@ -45,16 +70,23 @@ void img_process(string path, string outputPath, string filename) {
     Mat labels, centroids, stats;
     int n_labels = connectedComponentsWithStats(erode_img, labels, stats, centroids);
     uchar* p;
+    int dis = 200;
     for (int i = 1; i < n_labels; ++i) {
-        if (stats.at<int>(i, CC_STAT_AREA) < 5500) {
+        if (stats.at<int>(i, CC_STAT_AREA) < 5200 || (
+                    stats.at<int>(i, CC_STAT_LEFT) > dis && (stats.at<int>(i, CC_STAT_WIDTH) + stats.at<int>(i, CC_STAT_LEFT)) < (img.cols - dis) && stats.at<int>(i, CC_STAT_TOP) > dis && (stats.at<int>(i, CC_STAT_TOP) + stats.at<int>(i, CC_STAT_HEIGHT)) < (img.rows - dis)
+                    ) ) {
+
             for (int row = stats.at<int>(i, CC_STAT_TOP); row < stats.at<int>(i, CC_STAT_TOP) + stats.at<int>(i, CC_STAT_HEIGHT); ++row) {
                 p = erode_img.ptr<uchar>(row);
                 for (int col = stats.at<int>(i, CC_STAT_LEFT); col < stats.at<int>(i, CC_STAT_LEFT) + stats.at<int>(i, CC_STAT_WIDTH); col++) {
                     if (p[col] > 0) p[col] = 0;
+
                 }
             }
         }
     }
+    structure_element = getStructuringElement(MORPH_RECT, Size(7, 7));
+    dilate(erode_img, erode_img, structure_element);
     //imwrite(path + "/cbc/erode1.jpg", erode_img);
     bitwise_not(erode_img, erode_img);
     bitwise_and(erode_img, binary, erode_img);
@@ -72,10 +104,28 @@ void img_process(string path, string outputPath, string filename) {
     }
     int n = 15;
     img_lur = img_lur(Range(n, img_lur.rows - n), Range(n, img_lur.cols - n));
+    erode_img = erode_img(Range(n, erode_img.rows - n), Range(n, erode_img.cols - n));
+    img = img(Range(n, img.rows - n), Range(n, img.cols - n));
+//    n_labels = connectedComponentsWithStats(erode_img, labels, stats, centroids);
+//    for (int i = 1; i < n_labels; ++i) {
+//        //cout << stats.at<int>(i, CC_STAT_AREA) << endl;
+//        if (stats.at<int>(i, CC_STAT_AREA) > 200) {
+//            for (int row = stats.at<int>(i, CC_STAT_TOP); row < stats.at<int>(i, CC_STAT_TOP) + stats.at<int>(i, CC_STAT_HEIGHT); ++row) {
+//                p = erode_img.ptr<uchar>(row);
+//                for (int col = stats.at<int>(i, CC_STAT_LEFT); col < stats.at<int>(i, CC_STAT_LEFT) + stats.at<int>(i, CC_STAT_WIDTH); col++) {
+//                    img_lur.at<Vec3b>(row, col)[0] = img.at<Vec3b>(row, col)[0];
+//                    img_lur.at<Vec3b>(row, col)[1] = img.at<Vec3b>(row, col)[1];
+//                    img_lur.at<Vec3b>(row, col)[2] = img.at<Vec3b>(row, col)[2];
+//                }
+//            }
+//        }
+//    }
 
-    string file_name = filename.substr(path.size());
-    string newPath = outputPath + file_name;
-    generateDirecorys(QString::fromStdString(newPath));
+    string file_name = filename.substr(path.size() + 1);
+    string newPath = outputPath + file_name;//QString::fromStdString().toLocal8Bit().toStdString();
+    //cout<<newPath<<endl;
+    generateDirecorys_cbc(newPath);
+    //generateDirecorys(QString::fromStdString(newPath));
     imwrite(newPath, img_lur);
     SetResolution(newPath.c_str(), 300);
 }

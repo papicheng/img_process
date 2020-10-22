@@ -26,6 +26,9 @@ public:
     template<class F, class... Args>
     auto enqueue(F&& f, Args&&... args)
         ->std::future<typename std::result_of<F(Args...)>::type>;
+    void Stop(){
+        stop = true;
+    }
     ~ThreadPool();
 private:
     // need to keep track of threads so we can join them
@@ -107,5 +110,6 @@ void img_process(string path, string outputPath, string filename);
 void getFiles(const string& path, vector<string>& files);
 void generateDirecorys(QString directory);
 bool SetResolution(const char* path, int iResolution);
+void generateDirecorys_cbc(string path);
 
 #endif // IMGPROCESS_H

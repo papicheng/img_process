@@ -20,6 +20,12 @@ private slots:
 
     void on_pb_output_clicked();
 
+    void on_pb_start_clicked();
+
+    void on_pb_stop_clicked();
+
+    void on_pb_pause_clicked();
+
 private:
     Ui::MainWindow *ui;
 };
